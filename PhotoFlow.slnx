@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PhotoFlow.App/PhotoFlow.App.csproj" />
+    <Project Path="src/PhotoFlow.Core/PhotoFlow.Core.csproj" />
+    <Project Path="src/PhotoFlow.Infrastructure/PhotoFlow.Infrastructure.csproj" />
+    <Project Path="src/PhotoFlow.Probe/PhotoFlow.Probe.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PhotoFlow.Tests/PhotoFlow.Tests.csproj" />
+  </Folder>
+</Solution>

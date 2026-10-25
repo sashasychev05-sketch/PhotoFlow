@@ -1,0 +1,37 @@
+name: Windows build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Check public files
+        run: python scripts/check_public.py
+      - name: Restore pinned packages
+        run: dotnet restore PhotoFlow.slnx --locked-mode
+      - name: Build
+        run: dotnet build PhotoFlow.slnx -c Release --no-restore -m:1
+      - name: Test
+        run: dotnet tests/PhotoFlow.Tests/bin/Release/net10.0/PhotoFlow.Tests.dll
+      - name: Publish Windows preview
+        run: dotnet publish src/PhotoFlow.App/PhotoFlow.App.csproj -c Release --no-restore --self-contained false -o artifacts/PhotoFlow-win-x64 -m:1
+      - name: Include licenses and quick start
+        shell: pwsh
+        run: |
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.md artifacts/PhotoFlow-win-x64/
+          Copy-Item third_party artifacts/PhotoFlow-win-x64/third_party -Recurse
+          Copy-Item docs/GETTING_STARTED.md artifacts/PhotoFlow-win-x64/НАЧАТЬ.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: PhotoFlow-Windows-x64-preview
+          path: |
+            artifacts/PhotoFlow-win-x64/**
+            !artifacts/PhotoFlow-win-x64/**/*.pdb
