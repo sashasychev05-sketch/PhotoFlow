@@ -156,7 +156,7 @@ internal static class Probe
         options.TryGetValue(name, out var value) ? value : throw new ArgumentException($"Укажите --{name}.");
 
     private static void Help() => Console.WriteLine("""
-        PhotoFlow • диагностика 0.2.0 — консольные проверки источников
+        PhotoFlow • диагностика 0.2.1 — консольные проверки источников
 
         devices
         scan --folder "D:\Photos" [--limit 100] [--output "scan.ndjson"]

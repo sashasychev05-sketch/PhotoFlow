@@ -14,6 +14,32 @@ public sealed class PipelineTests : IDisposable
     public PipelineTests() => Directory.CreateDirectory(root);
     private string At(string name) => Path.Combine(root, name);
 
+    [Theory]
+    [InlineData("DCIM/.thumbnails/frame.jpg")]
+    [InlineData("Pictures/cache/frame.jpg")]
+    [InlineData("Android/data/app/files/frame.jpg")]
+    [InlineData("Pictures/.trashed-123-frame.jpg")]
+    [InlineData("Pictures/Корзина/frame.jpg")]
+    [InlineData("Pictures/Recently Deleted/frame.jpg")]
+    [InlineData("Pictures\\CACHE\\frame.jpg")]
+    public void ServiceAndDeletedPathsAreExcluded(string path) => Assert.True(MediaVisibility.IsExcluded(path));
+
+    [Fact]
+    public async Task ScanSkipsServiceTreesButKeepsNormalAlbums()
+    {
+        foreach (var path in new[] { "DCIM/Camera/frame.jpg", "Pictures/Album/frame.jpg", "Pictures/cache/frame.jpg",
+            "Android/media/app/frame.jpg", "DCIM/.thumbnails/frame.jpg", "Pictures/.trashed-123.jpg", "Trash/frame.jpg" })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(At(path))!);
+            await File.WriteAllBytesAsync(At(path), [1], Ct);
+        }
+        await using var source = new LocalFolderSource(root);
+        var items = await ListAsync(source, Ct);
+        Assert.Equal(2, items.Count);
+        Assert.Contains(items, item => item.RelativePath == "DCIM/Camera/frame.jpg");
+        Assert.Contains(items, item => item.RelativePath == "Pictures/Album/frame.jpg");
+    }
+
     [Fact]
     public async Task IndexingDoesNotNeedOriginalReadAccess()
     {

@@ -47,6 +47,53 @@ public sealed class CatalogStore : IDisposable
     private Task<T> Run<T>(Func<T> action, CancellationToken ct) => Task.Run(() =>
     { ct.ThrowIfCancellationRequested(); lock (gate) { ct.ThrowIfCancellationRequested(); return action(); } }, ct);
 
+    public static string Identity(MediaDescriptor item) => item.PersistentId is { Length: > 0 } persistent
+        ? "persistent:" + persistent : "path:" + item.RelativePath;
+
+    // Only called after a complete, warning-free enumeration. This changes catalog rows, never source files.
+    public Task CompleteScanAsync(string sourceId, IReadOnlyCollection<string> identities, CancellationToken ct) => Run(() =>
+    {
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "CREATE TEMP TABLE IF NOT EXISTS scan_seen(identity TEXT PRIMARY KEY); DELETE FROM scan_seen;";
+        command.ExecuteNonQuery();
+        command.CommandText = "INSERT OR IGNORE INTO scan_seen VALUES($identity)";
+        var parameter = command.Parameters.Add("$identity", SqliteType.Text);
+        foreach (var identity in identities)
+        { ct.ThrowIfCancellationRequested(); parameter.Value = identity; command.ExecuteNonQuery(); }
+        command.Parameters.Clear();
+        command.Parameters.AddWithValue("$source", sourceId);
+        command.CommandText = "DELETE FROM media WHERE source_id=$source AND identity NOT IN (SELECT identity FROM scan_seen)";
+        ct.ThrowIfCancellationRequested();
+        var removed = command.ExecuteNonQuery();
+        transaction.Commit();
+        return removed;
+    }, ct);
+
+    public Task RemoveExcludedAsync(CancellationToken ct) => Run(() =>
+    {
+        var excluded = new List<long>();
+        using (var read = connection.CreateCommand())
+        {
+            read.CommandText = "SELECT id,metadata FROM media";
+            using var reader = read.ExecuteReader();
+            while (reader.Read())
+            {
+                ct.ThrowIfCancellationRequested();
+                var media = JsonSerializer.Deserialize<MediaDescriptor>(reader.GetString(1))!;
+                if (MediaVisibility.IsExcluded(media.RelativePath)) excluded.Add(reader.GetInt64(0));
+            }
+        }
+        using var transaction = connection.BeginTransaction();
+        using var remove = connection.CreateCommand(); remove.Transaction = transaction;
+        remove.CommandText = "DELETE FROM media WHERE id=$id";
+        var parameter = remove.Parameters.Add("$id", SqliteType.Integer);
+        foreach (var id in excluded)
+        { ct.ThrowIfCancellationRequested(); parameter.Value = id; remove.ExecuteNonQuery(); }
+        transaction.Commit(); return excluded.Count;
+    }, ct);
+
     public Task UpsertAsync(CatalogSource source, IReadOnlyList<MediaDescriptor> items, CancellationToken ct) => Run(() =>
     {
         using var transaction = connection.BeginTransaction();
@@ -76,7 +123,7 @@ public sealed class CatalogStore : IDisposable
                 metadata=$metadata;
                 """;
             command.Parameters.AddWithValue("$source", source.Id);
-            command.Parameters.AddWithValue("$identity", item.PersistentId is { Length: > 0 } persistent ? "persistent:" + persistent : "path:" + item.RelativePath);
+            command.Parameters.AddWithValue("$identity", Identity(item));
             command.Parameters.AddWithValue("$name", item.FileName); command.Parameters.AddWithValue("$extension", item.Extension);
             command.Parameters.AddWithValue("$searchName", item.FileName.ToUpperInvariant());
             command.Parameters.AddWithValue("$capture", (object?)item.CaptureLocal?.ToString("O", CultureInfo.InvariantCulture) ?? DBNull.Value);

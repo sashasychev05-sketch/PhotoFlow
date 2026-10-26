@@ -15,6 +15,38 @@ public sealed class CatalogTests
         throw new DirectoryNotFoundException();
     }
     private static CatalogSource Source => new("source", "Test collection", "local", "test-fixture");
+
+    [Fact]
+    public async Task CompleteScanRemovesMissingRowsOnlyFromItsOwnSourceAndKeepsFlags()
+    {
+        using var store = new CatalogStore(Database());
+        await store.UpsertAsync(Source, [Item(1), Item(2)], Ct);
+        var other = Source with { Id = "other" };
+        await store.UpsertAsync(other, [Item(3)], Ct);
+        var kept = (await store.QueryAsync(new(Source.Id), 0, 200, Ct)).Single(i => i.Media == Item(1));
+        await store.SetFlagAsync(kept.Id, "favorite", true, Ct);
+        await store.SetFlagAsync(kept.Id, "selected", true, Ct);
+        await store.CompleteScanAsync(Source.Id, [CatalogStore.Identity(Item(1))], Ct);
+        Assert.Equal(2, await store.CountAsync(new(), Ct));
+        Assert.True((await store.QueryAsync(new(Source.Id), 0, 200, Ct)).Single().Favorite);
+        Assert.Single(await store.SelectedAsync(Source.Id, Ct));
+        await store.CompleteScanAsync(Source.Id, [], Ct);
+        Assert.Equal(1, await store.CountAsync(new(), Ct));
+    }
+
+    [Fact]
+    public async Task PartialOrCanceledScanRetainsUnseenRowsAndOldServiceRowsArePurged()
+    {
+        using var store = new CatalogStore(Database());
+        await store.UpsertAsync(Source, [Item(1), Item(2), Item(3) with { RelativePath = "DCIM/.thumbnails/old.jpg" }], Ct);
+        await store.UpsertAsync(Source, [Item(1)], Ct); // partial scan: no completion
+        Assert.Equal(3, await store.CountAsync(new(), Ct));
+        using var canceled = new CancellationTokenSource(); canceled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.CompleteScanAsync(Source.Id, [], canceled.Token));
+        Assert.Equal(3, await store.CountAsync(new(), Ct));
+        await store.RemoveExcludedAsync(Ct);
+        Assert.Equal(2, await store.CountAsync(new(), Ct));
+    }
     private static MediaDescriptor Item(int index, bool raw = false) => new($"key-{index}", $"frame-{index}.jpg", $"frame-{index}.jpg", raw ? ".dng" : ".jpg",
         MediaKind.Image, raw, index + 1, null, CaptureSource.Unknown, Confidence.Unknown, null, $"fingerprint-{index}");
 

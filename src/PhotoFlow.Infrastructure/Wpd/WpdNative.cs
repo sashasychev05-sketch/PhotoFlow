@@ -38,6 +38,8 @@ internal static class WpdNative
     internal static PropertyKey PersistentId = new(ObjectFormat, 5);
     internal static PropertyKey ContentType = new(ObjectFormat, 7);
     internal static PropertyKey Size = new(ObjectFormat, 11);
+    internal static PropertyKey Hidden = new(ObjectFormat, 9);
+    internal static PropertyKey System = new(ObjectFormat, 10);
     internal static PropertyKey FileName = new(ObjectFormat, 12);
     internal static PropertyKey Created = new(ObjectFormat, 18);
     internal static PropertyKey Modified = new(ObjectFormat, 19);

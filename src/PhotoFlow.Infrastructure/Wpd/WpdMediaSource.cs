@@ -60,7 +60,8 @@ public sealed class WpdMediaSource : IMediaSource
             content.Transfer(out resources);
             requested = WpdNative.Create<IPortableDeviceKeyCollection>(WpdNative.KeysClass);
             foreach (var property in new[] { WpdNative.Name, WpdNative.PersistentId, WpdNative.ContentType,
-                WpdNative.Size, WpdNative.FileName, WpdNative.Created, WpdNative.Modified, WpdNative.Width, WpdNative.Height })
+                WpdNative.Size, WpdNative.FileName, WpdNative.Created, WpdNative.Modified, WpdNative.Width, WpdNative.Height,
+                WpdNative.Hidden, WpdNative.System })
             { var key = property; requested.Add(ref key); }
             device = candidate;
         }
@@ -185,8 +186,10 @@ public sealed class WpdMediaSource : IMediaSource
         try
         {
             properties!.GetValues(id, requested!, out values);
+            if (ReadBool(values, WpdNative.Hidden) || ReadBool(values, WpdNative.System)) return;
             var name = ReadString(values, WpdNative.FileName) ?? ReadString(values, WpdNative.Name) ?? id;
             var relative = parentPath.Length == 0 ? name : parentPath + "/" + name;
+            if (MediaVisibility.IsExcluded(relative)) return;
             var type = ReadGuid(values, WpdNative.ContentType);
             if (type is null || type == WpdNative.Folder || type == WpdNative.Functional)
             { pending.Push((id, relative)); return; }
@@ -252,6 +255,8 @@ public sealed class WpdMediaSource : IMediaSource
 
     private static string? ReadString(IPortableDeviceValues values, PropertyKey key)
     { try { values.GetStringValue(ref key, out var value); return value; } catch (COMException) { return null; } }
+    private static bool ReadBool(IPortableDeviceValues values, PropertyKey key)
+    { try { values.GetBoolValue(ref key, out var value); return value; } catch (COMException) { return false; } }
     private static Guid? ReadGuid(IPortableDeviceValues values, PropertyKey key)
     { try { values.GetGuidValue(ref key, out var value); return value; } catch (COMException) { return null; } }
     private static uint? ReadUInt(IPortableDeviceValues values, PropertyKey key)

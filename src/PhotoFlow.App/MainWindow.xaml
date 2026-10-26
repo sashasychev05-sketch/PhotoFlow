@@ -49,7 +49,7 @@
        <Grid><Grid.RowDefinitions><RowDefinition Height="158"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <Grid Background="#292F29" CornerRadius="12,12,0,0">
          <FontIcon Glyph="&#xE91B;" FontSize="32" Foreground="#596458" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-         <Image Source="{x:Bind Preview, Mode=OneWay}" Stretch="UniformToFill" AutomationProperties.Name="Миниатюра"/>
+         <Image Source="{x:Bind Preview, Mode=OneWay}" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" AutomationProperties.Name="Миниатюра"/>
          <Border Background="#CF171C17" CornerRadius="4" HorizontalAlignment="Left" VerticalAlignment="Bottom" Padding="6,3" Margin="10"><TextBlock Text="{x:Bind Badge}" FontSize="10" Foreground="#E4EBDD"/></Border>
          <CheckBox IsChecked="{x:Bind Selected, Mode=TwoWay}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8,4,0,0" MinWidth="32" AutomationProperties.Name="Выбрать для импорта"/>
          <ToggleButton IsChecked="{x:Bind Favorite, Mode=TwoWay}" Content="{x:Bind FavoriteGlyph, Mode=OneWay}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0" Width="30" Height="30" Padding="0" Background="#CF171C17" Foreground="{StaticResource Accent}" BorderThickness="0" AutomationProperties.Name="Избранное PhotoFlow"/>

@@ -7,7 +7,7 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
     <UseSharedCompilation>false</UseSharedCompilation>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <PathMap>$(MSBuildThisFileDirectory)=/_/PhotoFlow/</PathMap>
   </PropertyGroup>

@@ -56,7 +56,7 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
         AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
         AppWindow.TitleBar.ButtonForegroundColor = Colors.White;
-        Root.Loaded += async (_, _) => { initialized = true; await ReloadAsync(); await LoadSourcesAsync(); };
+        Root.Loaded += async (_, _) => { await store.RemoveExcludedAsync(lifetime.Token); initialized = true; await ReloadAsync(); await LoadSourcesAsync(); };
         AppWindow.Closing += async (_, e) =>
         {
             if (closingReady || (!busy && pendingFlags.IsCompleted)) return;
@@ -170,6 +170,7 @@ public sealed partial class MainWindow : Window
         busyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         busy = true; Progress.Visibility = Visibility.Visible; ImportButton.IsEnabled = false; StopButton.Visibility = Visibility.Visible;
         var count = 0; var warnings = 0;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         source.Warning += _ => Interlocked.Increment(ref warnings);
         try
         {
@@ -179,6 +180,7 @@ public sealed partial class MainWindow : Window
                 var batch = new List<MediaDescriptor>(32);
                 await foreach (var item in source.EnumerateAsync(operation.Token))
                 {
+                    seen.Add(CatalogStore.Identity(item));
                     batch.Add(item); count++;
                     if (batch.Count < 32) continue;
                     await store.UpsertAsync(currentSource, batch, operation.Token); batch.Clear();
@@ -186,6 +188,8 @@ public sealed partial class MainWindow : Window
                     StatusLabel.Text = $"Сканирование · найдено {count:N0} · оригиналы не копируются";
                 }
                 await store.UpsertAsync(currentSource, batch, operation.Token);
+                // A canceled or incomplete scan must never remove unseen catalog entries.
+                if (warnings == 0) await store.CompleteScanAsync(currentSource.Id, seen, operation.Token);
             }
             StatusLabel.Text = $"Найдено {count:N0} кадров." + (warnings > 0 ? $" Есть недоступные объекты: {warnings}. Список может быть неполным." : " Выберите любимое — импортируйте только выбранное.");
         }
@@ -315,7 +319,8 @@ public sealed partial class MainWindow : Window
     private async Task<ImageSource?> PreviewAsync(MediaCard card, bool full, CancellationToken ct)
     {
         var item = card.Item;
-        var image = new BitmapImage { DecodePixelWidth = full ? 1800 : 480, DecodePixelHeight = full ? 1200 : 320 };
+        // One decode dimension preserves the original ratio, including portrait thumbnails.
+        var image = new BitmapImage { DecodePixelWidth = full ? 1800 : 480 };
         if (item.SourceKind == "local" || item.ImportedPath is { } imported && File.Exists(imported))
         {
             var path = item.ImportedPath is { } copied && File.Exists(copied) ? copied : Path.Combine(item.Location, item.Media.SourceItemKey);

@@ -50,6 +50,8 @@ public sealed class LocalFolderSource : IMediaSource
                 {
                     var attributes = File.GetAttributes(path);
                     if (attributes.HasFlag(FileAttributes.ReparsePoint)) continue;
+                    if ((attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0 ||
+                        MediaVisibility.IsExcluded(Path.GetRelativePath(root, path))) continue;
                     if (attributes.HasFlag(FileAttributes.Directory)) { pending.Push(path); continue; }
                     var extension = Path.GetExtension(path).ToLowerInvariant();
                     if (MediaTypes.Classify(extension) is not { } type) continue;
